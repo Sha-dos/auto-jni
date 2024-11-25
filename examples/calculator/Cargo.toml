@@ -1,0 +1,10 @@
+[package]
+name = "calculator"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+auto-jni = { path = "E:\\auto-jni" }
+
+[dependencies]
+auto-jni = { path = "E:\\auto-jni" }
