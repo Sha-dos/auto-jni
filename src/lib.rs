@@ -3,47 +3,47 @@ pub mod errors;
 
 pub use jni;
 pub use once_cell;
+pub use lazy_static;
 
 use std::collections::HashMap;
 use std::process::Command;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use jni::{InitArgsBuilder, JNIEnv, JNIVersion, JavaVM};
 use jni::objects::JObject;
 use jni::signature::ReturnType;
-use lazy_static::lazy_static;
 use regex::Regex;
 
-fn create_jvm() -> JavaVM {
-    /*let jvm_args = InitArgsBuilder::new()
-        .version(JNIVersion::V8)
-        .option("-XX:+UseSerialGC")
-        .option("-Djava.lang.invoke.stringConcat=BC_SB")
-        // .option("-Djava.library.path=/usr/local/frc/third-party/lib")
-        .option("-Djava.library.path=C:\\Program Files\\Microsoft\\jdk-11.0.16.101-hotspot\\bin")
-        // .option("-Djava.class.path=/home/lvuser/javastub.jar")
-        .build().unwrap();
-
-    let jvm = JavaVM::with_libjvm(jvm_args, || Ok("/usr/local/frc/JRE/lib/client/libjvm.so")).unwrap();
-    jvm.attach_current_thread_as_daemon().unwrap();
-    jvm*/
-
-    let jvm_args = InitArgsBuilder::new()
-        .version(JNIVersion::V8)
-        .option("-Xcheck:jni")
-        .option("-Djava.class.path=E:\\auto-jni\\examples\\calculator\\classes")
-        .build()
-        .unwrap();
-
-    JavaVM::new(jvm_args).unwrap()
-}
-
-lazy_static! {
-     static ref JAVA: JavaVM = create_jvm();
-}
-
-pub fn java() -> JNIEnv<'static> {
-    JAVA.attach_current_thread_permanently().unwrap()
-}
+// fn create_jvm() -> JavaVM {
+//     /*let jvm_args = InitArgsBuilder::new()
+//         .version(JNIVersion::V8)
+//         .option("-XX:+UseSerialGC")
+//         .option("-Djava.lang.invoke.stringConcat=BC_SB")
+//         // .option("-Djava.library.path=/usr/local/frc/third-party/lib")
+//         .option("-Djava.library.path=C:\\Program Files\\Microsoft\\jdk-11.0.16.101-hotspot\\bin")
+//         // .option("-Djava.class.path=/home/lvuser/javastub.jar")
+//         .build().unwrap();
+//
+//     let jvm = JavaVM::with_libjvm(jvm_args, || Ok("/usr/local/frc/JRE/lib/client/libjvm.so")).unwrap();
+//     jvm.attach_current_thread_as_daemon().unwrap();
+//     jvm*/
+//
+//     let jvm_args = InitArgsBuilder::new()
+//         .version(JNIVersion::V8)
+//         .option("-Xcheck:jni")
+//         .option("-Djava.class.path=E:\\auto-jni\\examples\\calculator\\classes")
+//         .build()
+//         .unwrap();
+//
+//     JavaVM::new(jvm_args).unwrap()
+// }
+//
+// lazy_static! {
+//      static ref JAVA: JavaVM = create_jvm();
+// }
+//
+// pub fn java() -> JNIEnv<'static> {
+//     JAVA.attach_current_thread_permanently().unwrap()
+// }
 
 #[derive(Debug, PartialEq)]
 struct MethodBinding {
@@ -55,7 +55,7 @@ struct MethodBinding {
     is_static: bool
 }
 
-fn parse_javap_output(class_name: &str, class_path: Option<&str>) -> Vec<MethodBinding> {
+fn parse_javap_output(class_name: &str, class_path: Option<String>) -> Vec<MethodBinding> {
     let mut command = Command::new("javap");
     command.args(["-s", "-p"]);
 
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn test_parse_javap() {
         let class_name = "com.example.Calculator";
-        let class_path = Some("test/target/classes");
+        let class_path = Some("test/target/classes".to_string());
         let bindings = parse_javap_output(class_name, class_path);
 
         assert!(!bindings.is_empty(), "No bindings were parsed");

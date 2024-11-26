@@ -170,7 +170,7 @@ macro_rules! generate_bindings {
 
 use std::io::Write;
 
-pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<&str>, output_path: &Path) -> std::io::Result<()> {
+pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>, output_path: &Path, jvm_options: Option<Vec<String>>) -> std::io::Result<()> {
     let mut file = File::create(output_path)?;
 
     // Write header imports
@@ -183,13 +183,36 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<&str>, o
     writeln!(file, "use auto_jni::jni::signature::{{Primitive, ReturnType}};")?;
     writeln!(file, "use auto_jni::jni;")?;
     writeln!(file, "use auto_jni::once_cell;")?;
-    writeln!(file, "use auto_jni::java;")?;
+    writeln!(file, "use auto_jni::lazy_static::lazy_static;")?;
+    writeln!(file, "use auto_jni::jni::{{InitArgsBuilder, JNIEnv, JNIVersion, JavaVM}};")?;
+    writeln!(file)?;
+
+    // Create java functions
+    writeln!(file, "lazy_static! {{ static ref JAVA: JavaVM = create_jvm(); }}")?;
+    writeln!(file)?;
+    writeln!(file, "fn create_jvm() -> JavaVM {{")?;
+    writeln!(file, "    let jvm_args = InitArgsBuilder::new()")?;
+    writeln!(file, "        .version(JNIVersion::V8)")?;
+    if let Some(jvm_options) = jvm_options {
+        for option in jvm_options {
+            writeln!(file, "        .option(\"{}\")", option.replace("\\", "\\\\"))?;
+        }
+    }
+
+    writeln!(file, "        .build().unwrap();")?;
+    writeln!(file, "    JavaVM::new(jvm_args).unwrap()")?;
+    writeln!(file, "}}")?;
+    writeln!(file)?;
+
+    writeln!(file, "pub fn java() -> JNIEnv<'static> {{")?;
+    writeln!(file, "    JAVA.attach_current_thread_permanently().unwrap()")?;
+    writeln!(file, "}}")?;
     writeln!(file)?;
 
     // Extract struct name from class_name (last part after dot)
     // let struct_name = class_name.split('.').last().unwrap_or(class_name);
     for class in class_name {
-        let bindings = parse_javap_output(class, class_path);
+        let bindings = parse_javap_output(class, class_path.clone());
         let struct_name = class.replace('.', "_");
 
         // Write struct definition
@@ -417,6 +440,7 @@ fn convert_return_type_to_string(return_type: ReturnType) -> String {
 
 use std::fs::File;
 use std::path::Path;
+use std::ptr::write;
 use jni::objects::JValue;
 use jni::signature::{Primitive, ReturnType};
 pub use {call, create, call_static, once, generate_bindings};
