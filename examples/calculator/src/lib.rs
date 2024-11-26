@@ -17,6 +17,10 @@ impl Calculator {
     fn multiply(&self, a: i32, b: i32) -> i32 {
         com_example_Calculator::multiply(&self.object.inner, a, b).unwrap()
     }
+
+    fn test(&self) -> i32 {
+        com_example_Calculator::dataHolderTest(&self.object.inner).unwrap()
+    }
 }
 
 #[cfg(test)]
@@ -31,6 +35,12 @@ mod tests {
     fn multiply() {
         let calculator = super::Calculator::new();
         assert_eq!(calculator.multiply(3, 2), 6);
+    }
+
+    #[test]
+    fn classes() {
+        let calculator = super::Calculator::new();
+        assert_eq!(calculator.test(), 1);
     }
 }
 

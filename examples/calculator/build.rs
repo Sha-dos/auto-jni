@@ -7,8 +7,8 @@ fn main() {
 
     let out = env::var("OUT_DIR").unwrap();
     let file = Path::new(&out).join("bindings.rs");
-    let class_name = "com.example.Calculator";
-    let class_path = Some("E:\\auto-jni\\test\\target\\classes");
+    let class_name = vec!["com.example.Calculator", "com.example.DataHolder"];
+    let class_path = Some("E:\\auto-jni\\examples\\calculator\\classes");
 
     generate_bindings_file(class_name, class_path, &*file).expect("TODO: panic message");
     // generate_bindings_file(class_name, class_path, Path::new("E:\\auto-jni\\examples\\calculator\\bindings.rs")).expect("TODO: panic message");

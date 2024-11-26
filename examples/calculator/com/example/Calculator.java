@@ -1,6 +1,8 @@
 // Calculator.java
 package com.example;
 
+import com.example.DataHolder;
+
 public class Calculator {
     private int lastResult;
 
@@ -30,4 +32,9 @@ public class Calculator {
     public String formatResult(String prefix) {
         return prefix + ": " + lastResult;
     }
+
+    public int dataHolderTest() {
+     DataHolder holder = new DataHolder();
+      return holder.test();
+  }
 }

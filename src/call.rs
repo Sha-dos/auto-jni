@@ -177,8 +177,7 @@ macro_rules! generate_bindings {
 
 use std::io::Write;
 
-pub fn generate_bindings_file(class_name: &str, class_path: Option<&str>, output_path: &Path) -> std::io::Result<()> {
-    let bindings = parse_javap_output(class_name, class_path);
+pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<&str>, output_path: &Path) -> std::io::Result<()> {
     let mut file = File::create(output_path)?;
 
     // Write header imports
@@ -196,141 +195,127 @@ pub fn generate_bindings_file(class_name: &str, class_path: Option<&str>, output
 
     // Extract struct name from class_name (last part after dot)
     // let struct_name = class_name.split('.').last().unwrap_or(class_name);
-    let struct_name = class_name.replace('.', "_");
+    for class in class_name {
+        let bindings = parse_javap_output(class, class_path);
+        let struct_name = class.replace('.', "_");
 
-    // Write struct definition
-    writeln!(file, "pub struct {} {{", struct_name)?;
-    writeln!(file, "    inner: GlobalRef,")?;
-    writeln!(file, "}}")?;
-    writeln!(file)?;
+        // Write struct definition
+        writeln!(file, "pub struct {} {{", struct_name)?;
+        writeln!(file, "    inner: GlobalRef,")?;
+        writeln!(file, "}}")?;
+        writeln!(file)?;
 
-    // Write implementation
-    writeln!(file, "impl<'a> {} {{", struct_name)?;
+        // Write implementation
+        writeln!(file, "impl<'a> {} {{", struct_name)?;
 
-    // Write default constructor
-    writeln!(file, "    pub fn new() -> Result<Self, JNIError> {{")?;
-    writeln!(file, "        Ok(Self {{")?;
-    writeln!(file, "            inner: create!(\"{}\", \"()V\", &[])", class_name.replace('.', "/"))?;
-    writeln!(file, "        }})")?;
-    writeln!(file, "    }}")?;
-
-    println!("Length: {}", bindings.len());
-    // Generate methods for each binding
-    for binding in bindings {
-        println!("Creating binding for: {}", binding.name);
-        writeln!(file)?;  // Add spacing between methods
-
-        // Convert Java types to Rust types for arguments
-        let args: Vec<(String, String)> = binding.args.iter().enumerate()
-            .map(|(i, arg_type)| {
-                (format!("arg_{}", i), arg_type.to_string())
-            })
-            .collect();
-
-        // Convert return type
-        let return_type = match binding.return_type.as_str() {
-            "I" => "i32",
-            "J" => "i64",
-            "D" => "f64",
-            "F" => "f32",
-            "Z" => "bool",
-            "B" => "i8",
-            "C" => "u16",
-            "S" => "i16",
-            "V" => "()",
-            _ => "JObject<'static>"
-        };
-
-        let method_name = if binding.name == "<init>" {
-            "new".to_string()
-        } else {
-            binding.name.clone()
-        };
-
-        // Write method signature
-        write!(file, "    pub fn {}(", method_name)?;
-
-        // Add self parameter for instance methods
-        // if method_name != "new" {
-        //     write!(file, "&self")?;
-        //     if !args.is_empty() {
-        //         write!(file, ", ")?;
-        //     }
-        // }
-
-        // Write method body
-        if method_name == "new" {
-            // Write arguments
-            for (i, (arg_name, arg_type)) in args.iter().enumerate() {
-                write!(file, "{}: {}", arg_name, java_type_to_rust(arg_type))?;
-                if i < args.len() - 1 {
-                    write!(file, ", ")?;
-                }
-            }
-            writeln!(file, ") -> Result<{}, JNIError> {{", return_type)?;
-
-            writeln!(file, "        Ok(Self {{")?;
-            write!(file, "            inner: create!(\"{}\", \"{}\", &[",
-                   binding.path,
-                   binding.signature)?;
-            for (i, (arg_name, arg_type)) in args.iter().enumerate() {
-                write!(file, "{}", get_input_type(arg_name, arg_type))?;
-                if i < args.len() - 1 {
-                    write!(file, ", ")?;
-                }
-            }
-            writeln!(file, "])")?;
-            writeln!(file, "        }})")?;
-        } else {
-            // Write arguments
-            write!(file, "instance: &'a GlobalRef, ")?;
-            for (i, (arg_name, arg_type)) in args.iter().enumerate() {
-                write!(file, "{}: {}", arg_name, java_type_to_rust(arg_type))?;
-                if i < args.len() - 1 {
-                    write!(file, ", ")?;
-                }
-            }
-            writeln!(file, ") -> Result<{}, JNIError> {{", return_type)?;
-            writeln!(file, "        let result = call!(")?;
-            writeln!(file, "            instance.as_obj(),")?;
-            writeln!(file, "            \"{}\",", binding.path)?;
-            writeln!(file, "            \"{}\",", binding.name)?;
-            writeln!(file, "            \"{}\",", binding.signature)?;
-            write!(file, "            &[")?;
-            for (i, (arg_name, arg_type)) in args.iter().enumerate() {
-                write!(file, "{}", get_input_type(arg_name, arg_type))?;
-                if i < args.len() - 1 {
-                    write!(file, ", ")?;
-                }
-            }
-            let return_type = get_return_type(&*binding.return_type);
-            writeln!(file, "],")?;
-            writeln!(file, "            {}", convert_return_type_to_string(return_type.clone()))?;
-            writeln!(file, "        );")?;
-            writeln!(file, "        Ok(result{})", return_type_to_function(return_type.clone()))?;
-        }
+        // Write default constructor
+        writeln!(file, "    pub fn new() -> Result<Self, JNIError> {{")?;
+        writeln!(file, "        Ok(Self {{")?;
+        writeln!(file, "            inner: create!(\"{}\", \"()V\", &[])", class.replace('.', "/"))?;
+        writeln!(file, "        }})")?;
         writeln!(file, "    }}")?;
+
+        println!("Length: {}", bindings.len());
+        // Generate methods for each binding
+        for binding in bindings {
+            println!("Creating binding for: {}", binding.name);
+            writeln!(file)?;  // Add spacing between methods
+
+            // Convert Java types to Rust types for arguments
+            let args: Vec<(String, String)> = binding.args.iter().enumerate()
+                .map(|(i, arg_type)| {
+                    (format!("arg_{}", i), arg_type.to_string())
+                })
+                .collect();
+
+            // Convert return type
+            let return_type = match binding.return_type.as_str() {
+                "I" => "i32",
+                "J" => "i64",
+                "D" => "f64",
+                "F" => "f32",
+                "Z" => "bool",
+                "B" => "i8",
+                "C" => "u16",
+                "S" => "i16",
+                "V" => "()",
+                _ => "JObject<'static>"
+            };
+
+            let method_name = if binding.name == "<init>" {
+                "new".to_string()
+            } else {
+                binding.name.clone()
+            };
+
+            // Write method signature
+            write!(file, "    pub fn {}(", method_name)?;
+
+            // Add self parameter for instance methods
+            // if method_name != "new" {
+            //     write!(file, "&self")?;
+            //     if !args.is_empty() {
+            //         write!(file, ", ")?;
+            //     }
+            // }
+
+            // Write method body
+            if method_name == "new" {
+                // Write arguments
+                for (i, (arg_name, arg_type)) in args.iter().enumerate() {
+                    write!(file, "{}: {}", arg_name, java_type_to_rust(arg_type))?;
+                    if i < args.len() - 1 {
+                        write!(file, ", ")?;
+                    }
+                }
+                writeln!(file, ") -> Result<{}, JNIError> {{", return_type)?;
+
+                writeln!(file, "        Ok(Self {{")?;
+                write!(file, "            inner: create!(\"{}\", \"{}\", &[",
+                       binding.path,
+                       binding.signature)?;
+                for (i, (arg_name, arg_type)) in args.iter().enumerate() {
+                    write!(file, "{}", get_input_type(arg_name, arg_type))?;
+                    if i < args.len() - 1 {
+                        write!(file, ", ")?;
+                    }
+                }
+                writeln!(file, "])")?;
+                writeln!(file, "        }})")?;
+            } else {
+                // Write arguments
+                write!(file, "instance: &'a GlobalRef, ")?;
+                for (i, (arg_name, arg_type)) in args.iter().enumerate() {
+                    write!(file, "{}: {}", arg_name, java_type_to_rust(arg_type))?;
+                    if i < args.len() - 1 {
+                        write!(file, ", ")?;
+                    }
+                }
+                writeln!(file, ") -> Result<{}, JNIError> {{", return_type)?;
+                writeln!(file, "        let result = call!(")?;
+                writeln!(file, "            instance.as_obj(),")?;
+                writeln!(file, "            \"{}\",", binding.path)?;
+                writeln!(file, "            \"{}\",", binding.name)?;
+                writeln!(file, "            \"{}\",", binding.signature)?;
+                write!(file, "            &[")?;
+                for (i, (arg_name, arg_type)) in args.iter().enumerate() {
+                    write!(file, "{}", get_input_type(arg_name, arg_type))?;
+                    if i < args.len() - 1 {
+                        write!(file, ", ")?;
+                    }
+                }
+                let return_type = get_return_type(&*binding.return_type);
+                writeln!(file, "],")?;
+                writeln!(file, "            {}", convert_return_type_to_string(return_type.clone()))?;
+                writeln!(file, "        );")?;
+                writeln!(file, "        Ok(result{})", return_type_to_function(return_type.clone()))?;
+            }
+            writeln!(file, "    }}")?;
+        }
+
+        writeln!(file, "}}")?;
+        writeln!(file)?;
     }
-
-    writeln!(file, "}}")?;
-    writeln!(file)?;
-
-    // Write conversion implementations
-    // writeln!(file, "impl From<JObject<'_>> for {} {{", struct_name)?;
-    // writeln!(file, "    fn from(obj: JObject) -> Self {{")?;
-    // writeln!(file, "        let java = auto_jni::java();")?;
-    // writeln!(file, "        Self {{")?;
-    // writeln!(file, "            inner: java.new_global_ref(obj).unwrap()")?;
-    // writeln!(file, "        }}")?;
-    // writeln!(file, "    }}")?;
-    // writeln!(file, "}}")?;
-    // writeln!(file)?;
-    //
-    // writeln!(file, "impl AsRef<JObject<'_>> for {} {{", struct_name)?;
-    // writeln!(file, "    fn as_ref(&self) -> &JObject {{")?;
-    // writeln!(file, "        self.inner.as_obj()")?;
-    // writeln!(file, "    }}")?;
-    // writeln!(file, "}}")?;
 
     Ok(())
 }

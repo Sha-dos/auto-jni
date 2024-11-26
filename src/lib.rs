@@ -30,7 +30,7 @@ fn create_jvm() -> JavaVM {
     let jvm_args = InitArgsBuilder::new()
         .version(JNIVersion::V8)
         .option("-Xcheck:jni")
-        .option("-Djava.class.path=E:\\auto-jni\\test\\target\\classes")
+        .option("-Djava.class.path=E:\\auto-jni\\examples\\calculator\\classes")
         .build()
         .unwrap();
 
