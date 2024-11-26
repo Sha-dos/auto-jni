@@ -1,34 +1,27 @@
 #[macro_export]
 macro_rules! call_static {
-    ($path:expr, $method:expr, $sig:expr, $args:expr, $ret:ty) => {{
-        static FNPTR: OnceCell<jni::objects::JStaticMethodID> = OnceCell::new();
-        static CLASS: OnceCell<jni::objects::JClass<'static>> = OnceCell::new();
-
-        let env = get_env()?;
+    ($path:tt, $method:tt, $sig:tt, $args:expr, $ret:expr) => {
+        {
+        use once_cell::sync::OnceCell;
+        use jni::objects::{JClass, JStaticMethodID};
+        use crate::java;
+        static FNPTR: OnceCell<JStaticMethodID> = OnceCell::new();
+        static CLASS: OnceCell<JClass> = OnceCell::new();
+        let mut java = java();
+        let fnptr = FNPTR.get_or_init(|| {
+            java.get_static_method_id($path, $method, $sig).unwrap()
+        });
         let class = CLASS.get_or_init(|| {
-            env.find_class($path)
-                .map_err(|e| JniError::Jni(e))
-                .expect("Failed to find class")
+            java.find_class($path).unwrap()
         });
 
-        let method_id = FNPTR.get_or_init(|| {
-            env.get_static_method_id(class, $method, $sig)
-                .map_err(|e| JniError::MethodNotFound(format!("{}::{} - {}", $path, $method, e)))
-                .expect("Failed to get method ID")
-        });
-
-        let result = unsafe {
-            env.call_static_method_unchecked(
-                class,
-                method_id,
-                ReturnType::Primitive(<$ret as IntoJavaType>::into_type()),
-                $args,
-            )?
-        };
-
-        Ok(<$ret as FromJValue>::from_jvalue(result))
-    }};
+        unsafe {
+            java.call_static_method_unchecked(class, fnptr, $ret, $args).unwrap()
+        }
+        }
+    };
 }
+
 
 #[macro_export]
 macro_rules! call {
@@ -251,14 +244,6 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<&str>, o
             // Write method signature
             write!(file, "    pub fn {}(", method_name)?;
 
-            // Add self parameter for instance methods
-            // if method_name != "new" {
-            //     write!(file, "&self")?;
-            //     if !args.is_empty() {
-            //         write!(file, ", ")?;
-            //     }
-            // }
-
             // Write method body
             if method_name == "new" {
                 // Write arguments
@@ -282,8 +267,31 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<&str>, o
                 }
                 writeln!(file, "])")?;
                 writeln!(file, "        }})")?;
+            } else if binding.is_static {
+                for (i, (arg_name, arg_type)) in args.iter().enumerate() {
+                    write!(file, "{}: {}", arg_name, java_type_to_rust(arg_type))?;
+                    if i < args.len() - 1 {
+                        write!(file, ", ")?;
+                    }
+                }
+                writeln!(file, ") -> Result<{}, JNIError> {{", return_type)?;
+                writeln!(file, "        let result = call_static!(")?;
+                writeln!(file, "            \"{}\",", binding.path)?;
+                writeln!(file, "            \"{}\",", binding.name)?;
+                writeln!(file, "            \"{}\",", binding.signature)?;
+                write!(file, "            &[")?;
+                for (i, (arg_name, arg_type)) in args.iter().enumerate() {
+                    write!(file, "{}", get_input_type(arg_name, arg_type))?;
+                    if i < args.len() - 1 {
+                        write!(file, ", ")?;
+                    }
+                }
+                let return_type = get_return_type(&*binding.return_type);
+                writeln!(file, "],")?;
+                writeln!(file, "            {}", convert_return_type_to_string(return_type.clone()))?;
+                writeln!(file, "        );")?;
+                writeln!(file, "        Ok(result{})", return_type_to_function(return_type.clone()))?;
             } else {
-                // Write arguments
                 write!(file, "instance: &'a GlobalRef, ")?;
                 for (i, (arg_name, arg_type)) in args.iter().enumerate() {
                     write!(file, "{}: {}", arg_name, java_type_to_rust(arg_type))?;

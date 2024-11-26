@@ -21,6 +21,10 @@ impl Calculator {
     fn test(&self) -> i32 {
         com_example_Calculator::dataHolderTest(&self.object.inner).unwrap()
     }
+
+    fn static_test() -> i32 {
+        com_example_Calculator::staticTest().unwrap()
+    }
 }
 
 #[cfg(test)]
@@ -41,6 +45,11 @@ mod tests {
     fn classes() {
         let calculator = super::Calculator::new();
         assert_eq!(calculator.test(), 1);
+    }
+
+    #[test]
+    fn static_test() {
+        assert_eq!(super::Calculator::static_test(), 1);
     }
 }
 

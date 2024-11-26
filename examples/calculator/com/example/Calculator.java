@@ -36,5 +36,9 @@ public class Calculator {
     public int dataHolderTest() {
      DataHolder holder = new DataHolder();
       return holder.test();
-  }
+    }
+
+    public static int staticTest() {
+      return 1;
+    }
 }

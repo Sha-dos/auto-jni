@@ -52,6 +52,7 @@ struct MethodBinding {
     signature: String,
     args: Vec<String>,
     return_type: String,
+    is_static: bool
 }
 
 fn parse_javap_output(class_name: &str, class_path: Option<&str>) -> Vec<MethodBinding> {
@@ -67,9 +68,7 @@ fn parse_javap_output(class_name: &str, class_path: Option<&str>) -> Vec<MethodB
     let output = command.output().expect("Failed to execute javap");
     let output_str = String::from_utf8_lossy(&output.stdout);
 
-    // Example line: "  public int add(int, int);"
-    // Descriptor line: "    descriptor: (II)I"
-    let method_regex = Regex::new(r"(?m)^\s*(?:public|private|protected)?\s*(?:static)?\s*(\S+)\s+(\w+)\s*\((.*?)\);").unwrap();
+    let method_regex = Regex::new(r"(?m)^\s*(?:public|private|protected)?\s*(static)?\s*(\S+)\s+(\w+)\s*\((.*?)\);").unwrap();
     let descriptor_regex = Regex::new(r"^\s*descriptor:\s*([^;\n]+)").unwrap();
 
     let mut bindings = Vec::new();
@@ -77,9 +76,10 @@ fn parse_javap_output(class_name: &str, class_path: Option<&str>) -> Vec<MethodB
 
     while let Some(line) = lines.next() {
         if let Some(captures) = method_regex.captures(line) {
-            let return_type = captures.get(1).map_or("", |m| m.as_str()).to_string();
-            let name = captures.get(2).map_or("", |m| m.as_str()).to_string();
-            let args_str = captures.get(3).map_or("", |m| m.as_str());
+            let is_static = captures.get(1).is_some();
+            let return_type = captures.get(2).map_or("", |m| m.as_str()).to_string();
+            let name = captures.get(3).map_or("", |m| m.as_str()).to_string();
+            let args_str = captures.get(4).map_or("", |m| m.as_str());
 
             while let Some(next_line) = lines.peek() {
                 if let Some(desc_captures) = descriptor_regex.captures(next_line) {
@@ -94,6 +94,7 @@ fn parse_javap_output(class_name: &str, class_path: Option<&str>) -> Vec<MethodB
                         signature,
                         args,
                         return_type,
+                        is_static,
                     });
                     break;
                 }
