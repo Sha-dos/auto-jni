@@ -146,13 +146,6 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
         // Write implementation
         writeln!(file, "impl<'a> {} {{", struct_name)?;
 
-        // Write default constructor
-        writeln!(file, "    pub fn new() -> Result<Self, JNIError> {{")?;
-        writeln!(file, "        Ok(Self {{")?;
-        writeln!(file, "            inner: create!(\"{}\", \"()V\", &[])", class.replace('.', "/"))?;
-        writeln!(file, "        }})")?;
-        writeln!(file, "    }}")?;
-
         println!("Length: {}", bindings.len());
 
         let mut methods: HashMap<String, i32> = HashMap::new();
@@ -160,7 +153,6 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
         // Generate methods for each binding
         for binding in bindings {
             println!("Creating binding for: {}", binding.name);
-            writeln!(file)?;  // Add spacing between methods
 
             let is_enum = binding.args.iter().any(|arg| {
                 // Detect enums based on known class names or patterns
@@ -199,7 +191,7 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
                 _ => "JObject<'static>"
             };
 
-            let mut method_name = if binding.name == "<init>" {
+            let mut method_name = if binding.name == "X" {
                 "new".to_string()
             } else {
                 binding.name.clone()
@@ -207,7 +199,7 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
 
             if methods.contains_key(&method_name) {
                 methods.insert(method_name.clone(), methods.get(&method_name.clone()).unwrap() + 1);
-                method_name.push_str(&methods.get(&method_name.clone()).unwrap().to_string());
+                method_name.push_str(format!("_{}", &methods.get(&method_name.clone()).unwrap().to_string()).as_str());
             } else {
                 methods.insert(method_name.clone(), 1);
             }
@@ -216,7 +208,7 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
             write!(file, "    pub fn {}(", method_name)?;
 
             // Write method body
-            if method_name == "new" {
+            if binding.is_constructor {
                 // Write arguments
                 for (i, (arg_name, arg_type)) in args.iter().enumerate() {
                     write!(file, "{}: {}", arg_name, java_type_to_rust(arg_type))?;
@@ -224,7 +216,7 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
                         write!(file, ", ")?;
                     }
                 }
-                writeln!(file, ") -> Result<{}, JNIError> {{", return_type)?;
+                writeln!(file, ") -> Result<Self, JNIError> {{")?;
 
                 writeln!(file, "        Ok(Self {{")?;
                 write!(file, "            inner: create!(\"{}\", \"{}\", &[",
