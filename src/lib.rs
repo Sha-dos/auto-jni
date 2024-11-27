@@ -43,14 +43,11 @@ fn parse_javap_output(class_name: &str, class_path: Option<String>) -> Vec<Metho
             let is_static = captures.get(1).is_some();
             let return_type = captures.get(2).map_or("", |m| m.as_str()).to_string();
             let name = captures.get(3).map_or("", |m| m.as_str()).to_string();
-            println!("name: {}", name);
             let args_str = captures.get(4).map_or("", |m| m.as_str());
 
             while let Some(next_line) = lines.peek() {
                 if let Some(desc_captures) = descriptor_regex.captures(next_line) {
                     let signature = desc_captures.get(1).map_or("", |m| m.as_str()).to_string();
-                    println!("name: {}, signature: {}", name, signature);
-
                     let args = parse_descriptor_args(&signature);
                     let return_type = parse_descriptor_return(&signature);
 
@@ -61,7 +58,7 @@ fn parse_javap_output(class_name: &str, class_path: Option<String>) -> Vec<Metho
                         args,
                         return_type,
                         is_static,
-                        is_constructor: name == "X",
+                        is_constructor: name.to_ascii_lowercase() == "x",
                     });
                     break;
                 }

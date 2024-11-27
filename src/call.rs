@@ -191,7 +191,7 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
                 _ => "JObject<'static>"
             };
 
-            let mut method_name = if binding.name == "X" {
+            let mut method_name = if binding.name.to_ascii_lowercase() == "x" {
                 "new".to_string()
             } else {
                 binding.name.clone()
