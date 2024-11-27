@@ -1,7 +1,10 @@
 [package]
 name = "auto-jni"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
+license = "MIT"
+description = "Automatically create bindings to Java through JNI"
+repository = "https://github.com/Sha-dos/auto-jni"
 
 [dependencies]
 jni = { version = "0.21.1", features = ["invocation"] }
