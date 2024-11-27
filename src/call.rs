@@ -292,6 +292,11 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
             writeln!(file, "    }}")?;
         }
 
+        // Expose inner
+        writeln!(file, "    pub fn inner(&self) -> GlobalRef {{")?;
+        writeln!(file, "        self.inner.clone()")?;
+        writeln!(file, "    }}")?;
+
         writeln!(file, "}}")?;
         writeln!(file)?;
     }
