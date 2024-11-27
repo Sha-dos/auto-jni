@@ -68,7 +68,7 @@ fn parse_javap_output(class_name: &str, class_path: Option<String>) -> Vec<Metho
     let output = command.output().expect("Failed to execute javap");
     let output_str = String::from_utf8_lossy(&output.stdout);
 
-    let method_regex = Regex::new(r"(?m)^\s*(?:public|private|protected)?\s*(static)?\s*(\S+)\s+(\w+)\s*\((.*?)\);").unwrap();
+    let method_regex = Regex::new(r"(?m)^\s*(?:public|private|protected)?\s*(static\s+native|native\s+static|static|native)?\s*([\w<>.\[\]]+)\s+([\w$]+)\s*\(([^)]*)\)\s*(?:throws\s+[\w.]+)?\s*;").unwrap();
     let descriptor_regex = Regex::new(r"^\s*descriptor:\s*(.+)$").unwrap();
 
     let mut bindings = Vec::new();
@@ -85,13 +85,8 @@ fn parse_javap_output(class_name: &str, class_path: Option<String>) -> Vec<Metho
                 if let Some(desc_captures) = descriptor_regex.captures(next_line) {
                     let signature = desc_captures.get(1).map_or("", |m| m.as_str()).to_string();
 
-                    println!("Raw descriptor: {}", signature);
-
                     let args = parse_descriptor_args(&signature);
                     let return_type = parse_descriptor_return(&signature);
-
-                    println!("Parsed args: {:?}", args); // Debug print
-                    println!("Parsed return type: {}", return_type); // Debug print
 
                     bindings.push(MethodBinding {
                         path: class_name.replace('.', "/"),
@@ -161,6 +156,24 @@ fn parse_descriptor_return(descriptor: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_native_method() {
+        let class_name = "edu.wpi.first.hal.HAL";
+        let class_path = Some("Z:\\frcrs\\hal-sys\\unwrapped".to_string());
+        let bindings = parse_javap_output(class_name, class_path);
+
+        assert!(!bindings.is_empty(), "No bindings were parsed");
+
+        let add_method = bindings.iter().find(|b| b.name == "initialize")
+            .expect("Could not find initialize method");
+
+        assert_eq!(add_method.path, "com/example/EnumTest");
+        assert_eq!(add_method.name, "check");
+        assert_eq!(add_method.signature, "(II)I");
+        assert_eq!(add_method.args, vec!["I", "I"]);
+        assert_eq!(add_method.return_type, "I");
+    }
 
     #[test]
     fn test_parse_javap() {
