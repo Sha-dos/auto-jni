@@ -85,6 +85,10 @@ macro_rules! once {
 
 use std::collections::HashMap;
 use std::io::Write;
+use std::fs::File;
+use std::path::Path;
+use jni::signature::{Primitive, ReturnType};
+use crate::parse_javap_output;
 
 pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>, output_path: &Path, jvm_options: Option<Vec<String>>) -> std::io::Result<()> {
     let mut file = File::create(output_path)?;
@@ -382,10 +386,4 @@ fn convert_return_type_to_string(return_type: ReturnType) -> String {
     }
 }
 
-use std::fs::File;
-use std::path::Path;
-use std::ptr::write;
-use jni::objects::JValue;
-use jni::signature::{Primitive, ReturnType};
 pub use {call, create, call_static, once};
-use crate::parse_javap_output;

@@ -5,45 +5,8 @@ pub use jni;
 pub use once_cell;
 pub use lazy_static;
 
-use std::collections::HashMap;
 use std::process::Command;
-use std::sync::{Arc, RwLock};
-use jni::{InitArgsBuilder, JNIEnv, JNIVersion, JavaVM};
-use jni::objects::JObject;
-use jni::signature::ReturnType;
 use regex::Regex;
-
-// fn create_jvm() -> JavaVM {
-//     /*let jvm_args = InitArgsBuilder::new()
-//         .version(JNIVersion::V8)
-//         .option("-XX:+UseSerialGC")
-//         .option("-Djava.lang.invoke.stringConcat=BC_SB")
-//         // .option("-Djava.library.path=/usr/local/frc/third-party/lib")
-//         .option("-Djava.library.path=C:\\Program Files\\Microsoft\\jdk-11.0.16.101-hotspot\\bin")
-//         // .option("-Djava.class.path=/home/lvuser/javastub.jar")
-//         .build().unwrap();
-//
-//     let jvm = JavaVM::with_libjvm(jvm_args, || Ok("/usr/local/frc/JRE/lib/client/libjvm.so")).unwrap();
-//     jvm.attach_current_thread_as_daemon().unwrap();
-//     jvm*/
-//
-//     let jvm_args = InitArgsBuilder::new()
-//         .version(JNIVersion::V8)
-//         .option("-Xcheck:jni")
-//         .option("-Djava.class.path=E:\\auto-jni\\examples\\calculator\\classes")
-//         .build()
-//         .unwrap();
-//
-//     JavaVM::new(jvm_args).unwrap()
-// }
-//
-// lazy_static! {
-//      static ref JAVA: JavaVM = create_jvm();
-// }
-//
-// pub fn java() -> JNIEnv<'static> {
-//     JAVA.attach_current_thread_permanently().unwrap()
-// }
 
 #[derive(Debug, PartialEq)]
 struct MethodBinding {
@@ -125,7 +88,6 @@ fn parse_descriptor_args(descriptor: &str) -> Vec<String> {
                     class_name.push(nc);
                 }
 
-                // Mark it as a potential enum (you can further verify later)
                 args.push(format!("L{}", class_name));
             },
             'I' | 'J' | 'D' | 'F' | 'B' | 'C' | 'S' | 'Z' => args.push(c.to_string()),
@@ -158,24 +120,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_native_method() {
-        let class_name = "edu.wpi.first.hal.HAL";
-        let class_path = Some("Z:\\frcrs\\hal-sys\\unwrapped".to_string());
-        let bindings = parse_javap_output(class_name, class_path);
-
-        assert!(!bindings.is_empty(), "No bindings were parsed");
-
-        let add_method = bindings.iter().find(|b| b.name == "initialize")
-            .expect("Could not find initialize method");
-
-        assert_eq!(add_method.path, "com/example/EnumTest");
-        assert_eq!(add_method.name, "check");
-        assert_eq!(add_method.signature, "(II)I");
-        assert_eq!(add_method.args, vec!["I", "I"]);
-        assert_eq!(add_method.return_type, "I");
-    }
-
-    #[test]
     fn test_parse_javap() {
         let class_name = "com.example.EnumTest";
         let class_path = Some("examples/create_enum/classes".to_string());
@@ -195,18 +139,18 @@ mod tests {
 
     #[test]
     fn test_parse_descriptor() {
-        // assert_eq!(
-        //     parse_descriptor_args("(II)I"),
-        //     vec!["I", "I"]
-        // );
-        // assert_eq!(
-        //     parse_descriptor_args("(ILjava/lang/String;[I)V"),
-        //     vec!["I", "java/lang/String", "[I"]
-        // );
-        // assert_eq!(
-        //     parse_descriptor_return("(II)I"),
-        //     "I"
-        // );
+        assert_eq!(
+            parse_descriptor_args("(II)I"),
+            vec!["I", "I"]
+        );
+        assert_eq!(
+            parse_descriptor_args("(ILjava/lang/String;[I)V"),
+            vec!["I", "java/lang/String", "[I"]
+        );
+        assert_eq!(
+            parse_descriptor_return("(II)I"),
+            "I"
+        );
         assert_eq!(
             parse_descriptor_args("(Lcom/example/EnumTest$CountEnum;)I"),
             vec!["Lcom/example/EnumTest$CountEnum;"]
