@@ -337,7 +337,7 @@ fn get_input_type(arg_name: &str, arg_type: &str) -> String {
         "J" => format!("JValue::Long({}).as_jni()", arg_name),
         "D" => format!("JValue::Double({}).as_jni()", arg_name),
         "F" => format!("JValue::Float({}).as_jni()", arg_name),
-        "Z" => format!("JValue::Boolean({}).as_jni()", arg_name),
+        "Z" => format!("JValue::Bool({}).as_jni()", arg_name),
         "B" => format!("JValue::Byte({}).as_jni()", arg_name),
         "C" => format!("JValue::Char({}).as_jni()", arg_name),
         "S" => format!("JValue::Short({}).as_jni()", arg_name),
