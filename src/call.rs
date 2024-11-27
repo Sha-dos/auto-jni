@@ -287,7 +287,7 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
                 writeln!(file, "],")?;
                 writeln!(file, "            {}", convert_return_type_to_string(return_type.clone()))?;
                 writeln!(file, "        );")?;
-                writeln!(file, "        Ok(result{})", return_type_to_function(return_type.clone()))?;
+                writeln!(file, "        Ok({})", return_type_to_function(return_type.clone()))?;
             }
             writeln!(file, "    }}")?;
         }
