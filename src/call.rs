@@ -2,8 +2,8 @@
 macro_rules! call_static {
     ($path:tt, $method:tt, $sig:tt, $args:expr, $ret:expr) => {
         {
-        use once_cell::sync::OnceCell;
-        use jni::objects::{JClass, JStaticMethodID};
+        use auto_jni::once_cell::sync::OnceCell;
+        use auto_jni::jni::objects::{JClass, JStaticMethodID};
         use crate::java;
         static FNPTR: OnceCell<JStaticMethodID> = OnceCell::new();
         static CLASS: OnceCell<JClass> = OnceCell::new();
@@ -83,91 +83,6 @@ macro_rules! once {
     };
 }
 
-#[macro_export]
-macro_rules! generate_bindings {
-    ($class_name:expr, $class_path:expr) => {
-        use jni::objects::{JObject, GlobalRef};
-        use jni::sys::*;
-        use once_cell::sync::OnceCell;
-        use crate::errors::JniError;
-        use crate::{call, call_static, create, once};
-        use jni::objects::JValue;
-        use jni::signature::{Primitive, ReturnType};
-
-        pub struct $class_name {
-            inner: GlobalRef,
-        }
-
-        impl $class_name {
-            fn parse_bindings() -> Vec<MethodBinding> {
-                parse_javap_output($class_name, Some($class_path))
-            }
-
-            pub fn new() -> Result<Self, JniError> {
-                Ok(Self {
-                    inner: create!($class_name, "()V", &[])
-                })
-            }
-
-            $(
-                // Generate method for each binding
-                pub fn $binding.name(&self $(, $arg_name: $arg_type)*) -> Result<$return_type, JniError> {
-                    if binding.is_static {
-                        call_static!(
-                            &binding.path,
-                            &binding.name,
-                            &binding.signature,
-                            &[$(JValue::from($arg_name)),*],
-                            $return_type
-                        )
-                    } else {
-                        let result = call!(
-                            &self.inner,
-                            &binding.path,
-                            &binding.name,
-                            &binding.signature,
-                            &[$(JValue::from($arg_name)),*],
-                            ReturnType::from(binding.return_type.clone())
-                        );
-                        Ok(<$return_type>::from_jvalue(result)?)
-                    }
-                }
-            )*
-        }
-
-        // Generate constructor variants based on binding patterns
-        impl $class_name {
-            $(
-                pub fn $ctor_name($($arg_name: $arg_type),*) -> Result<Self, JniError> {
-                    Ok(Self {
-                        inner: create!(
-                            &binding.path,
-                            &binding.signature,
-                            &[$(JValue::from($arg_name)),*]
-                        )
-                    })
-                }
-            )*
-        }
-
-        // Implement conversion traits
-        impl From<JObject<'_>> for $class_name {
-            fn from(obj: JObject) -> Self {
-                let java = crate::java();
-                Self {
-                    inner: java.new_global_ref(obj).unwrap()
-                }
-            }
-        }
-
-        impl AsRef<JObject<'_>> for $class_name {
-            fn as_ref(&self) -> &JObject {
-                self.inner.as_obj()
-            }
-        }
-    };
-}
-
 use std::io::Write;
 
 pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>, output_path: &Path, jvm_options: Option<Vec<String>>) -> std::io::Result<()> {
@@ -185,6 +100,7 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
     writeln!(file, "use auto_jni::once_cell;")?;
     writeln!(file, "use auto_jni::lazy_static::lazy_static;")?;
     writeln!(file, "use auto_jni::jni::{{InitArgsBuilder, JNIEnv, JNIVersion, JavaVM}};")?;
+    writeln!(file, "use std::collections::HashMap;")?;
     writeln!(file)?;
 
     // Create java functions
@@ -443,5 +359,5 @@ use std::path::Path;
 use std::ptr::write;
 use jni::objects::JValue;
 use jni::signature::{Primitive, ReturnType};
-pub use {call, create, call_static, once, generate_bindings};
+pub use {call, create, call_static, once};
 use crate::parse_javap_output;
