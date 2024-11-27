@@ -153,6 +153,22 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
             println!("Creating binding for: {}", binding.name);
             writeln!(file)?;  // Add spacing between methods
 
+            let is_enum = binding.args.iter().any(|arg| {
+                // Detect enums based on known class names or patterns
+                arg.starts_with("L") && arg.contains("Enum")
+            });
+
+            if is_enum {
+                writeln!(file, "// Detected enum in method: {}", binding.name)?;
+
+                for arg in &binding.args {
+                    if arg.starts_with("L") && arg.contains("Enum") {
+                        let enum_name = arg.trim_start_matches('L').replace('/', ".");
+                        writeln!(file, "    // Argument is an enum: {}", enum_name)?;
+                    }
+                }
+            }
+
             // Convert Java types to Rust types for arguments
             let args: Vec<(String, String)> = binding.args.iter().enumerate()
                 .map(|(i, arg_type)| {

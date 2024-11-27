@@ -112,29 +112,31 @@ fn parse_javap_output(class_name: &str, class_path: Option<String>) -> Vec<Metho
 }
 
 fn parse_descriptor_args(descriptor: &str) -> Vec<String> {
-    let mut args = Vec::new();
-    let mut chars = descriptor
+    let args_section = descriptor
         .trim_start_matches('(')
         .split(')')
         .next()
-        .unwrap_or("")
-        .chars()
-        .peekable();
+        .unwrap_or("");
+
+    let mut args = Vec::new();
+    let mut chars = args_section.chars().peekable();
 
     while let Some(c) = chars.next() {
         match c {
             'L' => {
-                let mut class_name = String::from("L");
+                let mut class_name = String::new();
                 while let Some(nc) = chars.next() {
-                    class_name.push(nc);
                     if nc == ';' { break; }
+                    class_name.push(nc);
                 }
-                args.push(class_name);
+
+                // Mark it as a potential enum (you can further verify later)
+                args.push(format!("L{}", class_name));
             },
             'I' | 'J' | 'D' | 'F' | 'B' | 'C' | 'S' | 'Z' => args.push(c.to_string()),
             '[' => {
                 let mut array_type = String::from("[");
-                while let Some(next_char) = chars.next() {
+                if let Some(next_char) = chars.next() {
                     array_type.push(next_char);
                     if next_char == 'L' {
                         while let Some(nc) = chars.next() {
@@ -142,7 +144,6 @@ fn parse_descriptor_args(descriptor: &str) -> Vec<String> {
                             if nc == ';' { break; }
                         }
                     }
-                    break;
                 }
                 args.push(array_type);
             },
