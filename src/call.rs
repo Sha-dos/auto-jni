@@ -83,6 +83,7 @@ macro_rules! once {
     };
 }
 
+use std::collections::HashMap;
 use std::io::Write;
 
 pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>, output_path: &Path, jvm_options: Option<Vec<String>>) -> std::io::Result<()> {
@@ -148,6 +149,9 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
         writeln!(file, "    }}")?;
 
         println!("Length: {}", bindings.len());
+
+        let mut methods: HashMap<String, i32> = HashMap::new();
+
         // Generate methods for each binding
         for binding in bindings {
             println!("Creating binding for: {}", binding.name);
@@ -190,11 +194,18 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
                 _ => "JObject<'static>"
             };
 
-            let method_name = if binding.name == "<init>" {
+            let mut method_name = if binding.name == "<init>" {
                 "new".to_string()
             } else {
                 binding.name.clone()
             };
+
+            if methods.contains_key(&method_name) {
+                methods.insert(method_name.clone(), methods.get(&method_name.clone()).unwrap() + 1);
+                method_name.push_str(&methods.get(&method_name.clone()).unwrap().to_string());
+            } else {
+                methods.insert(method_name.clone(), 1);
+            }
 
             // Write method signature
             write!(file, "    pub fn {}(", method_name)?;
