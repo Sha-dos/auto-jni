@@ -102,6 +102,7 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
     writeln!(file, "use auto_jni::lazy_static::lazy_static;")?;
     writeln!(file, "use auto_jni::jni::{{InitArgsBuilder, JNIEnv, JNIVersion, JavaVM}};")?;
     writeln!(file, "use std::collections::HashMap;")?;
+    writeln!(file, "use auto_jni::jni::objects::JObjectArray;")?;
     writeln!(file)?;
 
     // Create java functions
@@ -337,7 +338,7 @@ fn get_input_type(arg_name: &str, arg_type: &str) -> String {
         "J" => format!("JValue::Long({}).as_jni()", arg_name),
         "D" => format!("JValue::Double({}).as_jni()", arg_name),
         "F" => format!("JValue::Float({}).as_jni()", arg_name),
-        "Z" => format!("JValue::Bool({}).as_jni()", arg_name),
+        "Z" => format!("JValue::Bool({} as u8).as_jni()", arg_name),
         "B" => format!("JValue::Byte({}).as_jni()", arg_name),
         "C" => format!("JValue::Char({}).as_jni()", arg_name),
         "S" => format!("JValue::Short({}).as_jni()", arg_name),
