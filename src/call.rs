@@ -245,7 +245,7 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
                 writeln!(file, "],")?;
                 writeln!(file, "            {}", convert_return_type_to_string(return_type.clone()))?;
                 writeln!(file, "        );")?;
-                writeln!(file, "        Ok(result{})", return_type_to_function(return_type.clone()))?;
+                writeln!(file, "        Ok({})", return_type_to_function(return_type.clone()))?;
             } else {
                 write!(file, "instance: &'a GlobalRef, ")?;
                 for (i, (arg_name, arg_type)) in args.iter().enumerate() {
@@ -305,16 +305,16 @@ fn java_type_to_rust(java_type: &str) -> &str {
 /// ex. ReturnType::Primitive(Primitive::Int) => ".i().unwrap()"
 fn return_type_to_function(return_type: ReturnType) -> String {
     match return_type {
-        ReturnType::Primitive(Primitive::Int) => ".i().unwrap()".to_string(),
-        ReturnType::Primitive(Primitive::Long) => ".j().unwrap()".to_string(),
-        ReturnType::Primitive(Primitive::Double) => ".d().unwrap()".to_string(),
-        ReturnType::Primitive(Primitive::Float) => ".f().unwrap()".to_string(),
-        ReturnType::Primitive(Primitive::Boolean) => ".z().unwrap()".to_string(),
-        ReturnType::Primitive(Primitive::Byte) => ".b().unwrap()".to_string(),
-        ReturnType::Primitive(Primitive::Char) => ".c().unwrap()".to_string(),
-        ReturnType::Primitive(Primitive::Short) => ".s().unwrap()".to_string(),
-        ReturnType::Primitive(Primitive::Void) => "".to_string(),
-        ReturnType::Object => ".l().unwrap()".to_string(),
+        ReturnType::Primitive(Primitive::Int) => "result.i().unwrap()".to_string(),
+        ReturnType::Primitive(Primitive::Long) => "result.j().unwrap()".to_string(),
+        ReturnType::Primitive(Primitive::Double) => "result.d().unwrap()".to_string(),
+        ReturnType::Primitive(Primitive::Float) => "result.f().unwrap()".to_string(),
+        ReturnType::Primitive(Primitive::Boolean) => "result.z().unwrap()".to_string(),
+        ReturnType::Primitive(Primitive::Byte) => "result.b().unwrap()".to_string(),
+        ReturnType::Primitive(Primitive::Char) => "result.c().unwrap()".to_string(),
+        ReturnType::Primitive(Primitive::Short) => "result.s().unwrap()".to_string(),
+        ReturnType::Primitive(Primitive::Void) => "()".to_string(),
+        ReturnType::Object => "result.l().unwrap()".to_string(),
         _ => "".to_string()
     }
 }
