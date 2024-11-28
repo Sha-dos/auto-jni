@@ -322,8 +322,8 @@ fn java_type_to_rust(java_type: &str) -> &str {
         "C" => "u16",
         "S" => "i16",
         "V" => "()",
-        t if t.starts_with("L") => "JObject",
-        t if t.starts_with("[") => "JObjectArray",
+        t if t.starts_with("L") => "&JObject",
+        t if t.starts_with("[") => "&JObjectArray",
         _ => "JObject"
     }
 }
@@ -357,7 +357,7 @@ fn get_input_type(arg_name: &str, arg_type: &str) -> String {
         "B" => format!("JValue::Byte({}).as_jni()", arg_name),
         "C" => format!("JValue::Char({}).as_jni()", arg_name),
         "S" => format!("JValue::Short({}).as_jni()", arg_name),
-        t => format!("JValue::Object(&{}).as_jni()", arg_name),
+        t => format!("JValue::Object({}).as_jni()", arg_name),
         _ => arg_type.to_string()
     }
 }
