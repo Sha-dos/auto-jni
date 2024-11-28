@@ -152,7 +152,7 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
         let mut enums: Vec<String> = Vec::new();
 
         // Generate methods for each binding
-        for binding in bindings {
+        for mut binding in bindings {
             println!("Creating binding for: {}", binding.name);
 
             let mut enums_to_add: Vec<String> = binding.args.iter()
@@ -175,6 +175,13 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
                     writeln!(file, "        ).l().unwrap()")?;
                     writeln!(file, "    }}")?;
                 }
+            }
+
+            // Filter names to remove $ from lambda (lambda$takeSnapshot$1)
+            if binding.name.contains('$') {
+                let mut split = binding.name.split('$');
+                split.next();
+                binding.name = split.next().unwrap().to_string();
             }
 
             // Convert Java types to Rust types for arguments
