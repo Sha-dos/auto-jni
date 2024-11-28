@@ -149,24 +149,31 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
         println!("Length: {}", bindings.len());
 
         let mut methods: HashMap<String, i32> = HashMap::new();
+        let mut enums: Vec<String> = Vec::new();
 
         // Generate methods for each binding
         for binding in bindings {
             println!("Creating binding for: {}", binding.name);
 
-            let is_enum = binding.args.iter().any(|arg| {
-                // Detect enums based on known class names or patterns
-                arg.starts_with("L") && arg.contains("Enum")
-            });
+            let mut enums_to_add: Vec<String> = binding.args.iter()
+                .filter(|arg| arg.contains('$'))
+                .map(|arg| arg.to_string())
+                .collect::<Vec<String>>();
 
-            if is_enum {
-                writeln!(file, "// Detected enum in method: {}", binding.name)?;
+            for mut enum_name in enums_to_add {
+                enum_name.remove(0);
+                if !enums.iter().any(|e| e == &enum_name) {
+                    enums.push(enum_name.clone());
 
-                for arg in &binding.args {
-                    if arg.starts_with("L") && arg.contains("Enum") {
-                        let enum_name = arg.trim_start_matches('L').replace('/', ".");
-                        writeln!(file, "    // Argument is an enum: {}", enum_name)?;
-                    }
+                    writeln!(file, "    pub fn {}_from_str(s: &str) -> JObject {{", enum_name.replace("/", "_").replace("$", "_"))?;
+                    writeln!(file, "        call_static!(")?;
+                    writeln!(file, "            \"{}\",", enum_name)?;
+                    writeln!(file, "            \"valueOf\",")?;
+                    writeln!(file, "            \"(Ljava/lang/String;)L{};\",", enum_name)?;
+                    writeln!(file, "            &[JValue::Object(&java().new_string(s).unwrap()).as_jni()],")?;
+                    writeln!(file, "            ReturnType::Object")?;
+                    writeln!(file, "        ).l().unwrap()")?;
+                    writeln!(file, "    }}")?;
                 }
             }
 
