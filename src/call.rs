@@ -95,17 +95,14 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
 
     // Write header imports
     writeln!(file, "use auto_jni::jni::objects::{{JObject, GlobalRef}};")?;
-    writeln!(file, "use auto_jni::jni::sys::*;")?;
-    writeln!(file, "use auto_jni::once_cell::sync::OnceCell;")?;
     writeln!(file, "use auto_jni::errors::JNIError;")?;
-    writeln!(file, "use auto_jni::{{call, call_static, create, once}};")?;
+    writeln!(file, "use auto_jni::{{call, call_static, create}};")?;
     writeln!(file, "use auto_jni::jni::objects::JValue;")?;
     writeln!(file, "use auto_jni::jni::signature::{{Primitive, ReturnType}};")?;
     writeln!(file, "use auto_jni::jni;")?;
     writeln!(file, "use auto_jni::once_cell;")?;
     writeln!(file, "use auto_jni::lazy_static::lazy_static;")?;
     writeln!(file, "use auto_jni::jni::{{InitArgsBuilder, JNIEnv, JNIVersion, JavaVM}};")?;
-    writeln!(file, "use std::collections::HashMap;")?;
     writeln!(file, "use auto_jni::jni::objects::JObjectArray;")?;
     writeln!(file)?;
 
@@ -138,12 +135,16 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
         let struct_name = class.replace('.', "_");
 
         // Write struct definition
+        writeln!(file, "#[allow(non_snake_case)]")?;
+        writeln!(file, "#[allow(non_camel_case_types)]")?;
         writeln!(file, "pub struct {} {{", struct_name)?;
         writeln!(file, "    inner: GlobalRef,")?;
         writeln!(file, "}}")?;
         writeln!(file)?;
 
         // Write implementation
+        writeln!(file, "#[allow(non_snake_case)]")?;
+        writeln!(file, "#[allow(non_camel_case_types)]")?;
         writeln!(file, "impl<'a> {} {{", struct_name)?;
 
         println!("Length: {}", bindings.len());
@@ -164,7 +165,7 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
                 enum_name.remove(0);
                 if !enums.iter().any(|e| e == &enum_name) {
                     enums.push(enum_name.clone());
-
+                    writeln!(file, "    #[allow(non_snake_case)]")?;
                     writeln!(file, "    pub fn {}_from_str(s: &str) -> JObject {{", enum_name.replace("/", "_").replace("$", "_"))?;
                     writeln!(file, "        call_static!(")?;
                     writeln!(file, "            \"{}\",", enum_name)?;
@@ -219,6 +220,7 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
             }
 
             // Write method signature
+            writeln!(file, "    #[allow(non_snake_case)]")?;
             write!(file, "    pub fn {}(", method_name)?;
 
             // Write method body
@@ -252,7 +254,12 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
                     }
                 }
                 writeln!(file, ") -> Result<{}, JNIError> {{", return_type)?;
-                writeln!(file, "        let result = call_static!(")?;
+                let return_type = get_return_type(&*binding.return_type);
+                writeln!(file, "        {} call_static!(", if return_type == ReturnType::Primitive(Primitive::Void) {
+                    "".to_string()
+                } else {
+                    "let result =".to_string()
+                })?;
                 writeln!(file, "            \"{}\",", binding.path)?;
                 writeln!(file, "            \"{}\",", binding.name)?;
                 writeln!(file, "            \"{}\",", binding.signature)?;
@@ -263,7 +270,6 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
                         write!(file, ", ")?;
                     }
                 }
-                let return_type = get_return_type(&*binding.return_type);
                 writeln!(file, "],")?;
                 writeln!(file, "            {}", convert_return_type_to_string(return_type.clone()))?;
                 writeln!(file, "        );")?;
@@ -277,7 +283,12 @@ pub fn generate_bindings_file(class_name: Vec<&str>, class_path: Option<String>,
                     }
                 }
                 writeln!(file, ") -> Result<{}, JNIError> {{", return_type)?;
-                writeln!(file, "        let result = call!(")?;
+                let return_type = get_return_type(&*binding.return_type);
+                writeln!(file, "        {} call!(", if return_type == ReturnType::Primitive(Primitive::Void) {
+                    "".to_string()
+                } else {
+                    "let result =".to_string()
+                })?;
                 writeln!(file, "            instance.as_obj(),")?;
                 writeln!(file, "            \"{}\",", binding.path)?;
                 writeln!(file, "            \"{}\",", binding.name)?;
