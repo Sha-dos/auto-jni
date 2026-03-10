@@ -1,13 +1,21 @@
-pub mod call;
 pub mod errors;
+mod call;
 
+#[cfg(feature = "build")]
+mod codegen;
+
+#[cfg(feature = "build")]
+pub use codegen::generate_bindings_file;
+
+// Runtime re-exports used by generated code.
 pub use jni;
 pub use once_cell;
 pub use lazy_static;
 
-use std::process::Command;
+#[cfg(feature = "build")]
 use regex::Regex;
 
+#[cfg(feature = "build")]
 #[derive(Debug, PartialEq)]
 struct MethodBinding {
     path: String,
@@ -19,7 +27,10 @@ struct MethodBinding {
     is_constructor: bool,
 }
 
-fn parse_javap_output(class_name: &str, class_path: Option<String>) -> Vec<MethodBinding> {
+#[cfg(feature = "build")]
+pub(crate) fn parse_javap_output(class_name: &str, class_path: Option<String>) -> Vec<MethodBinding> {
+    use std::process::Command;
+
     let mut command = Command::new("javap");
     command.args(["-s", "-p"]);
 
@@ -32,7 +43,14 @@ fn parse_javap_output(class_name: &str, class_path: Option<String>) -> Vec<Metho
     let output = command.output().expect("Failed to execute javap");
     let output_str = String::from_utf8_lossy(&output.stdout);
 
-    let method_regex = Regex::new(r"(?m)^\s*(?:public|private|protected)?\s*(static\s+native|native\s+static|static|native)?\s*([\w<>.\[\]]*)?\s*([\w$<>]+)\s*\(([^)]*)\)\s*(?:throws\s+[\w.]+)?\s*;").unwrap();
+    let simple_class_name = class_name.split('.').last().unwrap_or(class_name);
+
+    // Group 1 = static modifier
+    // Group 2 = "ReturnType MethodName" for regular methods, or just "com.example.ClassName" for constructors.
+    // We split group 2 on whitespace and take the last token, then strip any qualifier via '.'.
+    let method_regex = Regex::new(
+        r"(?m)^\s*(?:public|private|protected)?\s*(static\s+native|native\s+static|static|native)?\s*([\w$<>\[\].]+(?:\s+[\w$<>]+)?)\s*\(([^)]*)\)\s*(?:throws\s+[\w.,\s]+)?\s*;"
+    ).unwrap();
     let descriptor_regex = Regex::new(r"^\s*descriptor:\s*(.+)$").unwrap();
 
     let mut bindings = Vec::new();
@@ -40,10 +58,11 @@ fn parse_javap_output(class_name: &str, class_path: Option<String>) -> Vec<Metho
 
     while let Some(line) = lines.next() {
         if let Some(captures) = method_regex.captures(line) {
-            let is_static = captures.get(1).is_some();
-            let return_type = captures.get(2).map_or("", |m| m.as_str()).to_string();
-            let name = captures.get(3).map_or("", |m| m.as_str()).to_string();
-            let args_str = captures.get(4).map_or("", |m| m.as_str());
+            let is_static = captures.get(1).map_or("", |m| m.as_str()).contains("static");
+            let combined = captures.get(2).map_or("", |m| m.as_str());
+            let last_token = combined.split_whitespace().last().unwrap_or(combined);
+            let name = last_token.split('.').last().unwrap_or(last_token).to_string();
+            let is_constructor = name == simple_class_name;
 
             while let Some(next_line) = lines.peek() {
                 if let Some(desc_captures) = descriptor_regex.captures(next_line) {
@@ -58,7 +77,7 @@ fn parse_javap_output(class_name: &str, class_path: Option<String>) -> Vec<Metho
                         args,
                         return_type,
                         is_static,
-                        is_constructor: name.to_ascii_lowercase() == "x",
+                        is_constructor,
                     });
                     break;
                 }
@@ -70,6 +89,7 @@ fn parse_javap_output(class_name: &str, class_path: Option<String>) -> Vec<Metho
     bindings
 }
 
+#[cfg(feature = "build")]
 fn parse_descriptor_args(descriptor: &str) -> Vec<String> {
     let args_section = descriptor
         .trim_start_matches('(')
@@ -88,9 +108,8 @@ fn parse_descriptor_args(descriptor: &str) -> Vec<String> {
                     if nc == ';' { break; }
                     class_name.push(nc);
                 }
-
                 args.push(format!("L{}", class_name));
-            },
+            }
             'I' | 'J' | 'D' | 'F' | 'B' | 'C' | 'S' | 'Z' => args.push(c.to_string()),
             '[' => {
                 let mut array_type = String::from("[");
@@ -104,7 +123,7 @@ fn parse_descriptor_args(descriptor: &str) -> Vec<String> {
                     }
                 }
                 args.push(array_type);
-            },
+            }
             _ => continue,
         }
     }
@@ -112,65 +131,43 @@ fn parse_descriptor_args(descriptor: &str) -> Vec<String> {
     args
 }
 
+#[cfg(feature = "build")]
 fn parse_descriptor_return(descriptor: &str) -> String {
     descriptor.split(')').nth(1).unwrap_or("").to_string()
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "build"))]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_javap() {
-        let class_name = "com.example.EnumTest";
-        let class_path = Some("examples/create_enum/classes".to_string());
-        let bindings = parse_javap_output(class_name, class_path);
-
-        assert!(!bindings.is_empty(), "No bindings were parsed");
-
-        let add_method = bindings.iter().find(|b| b.name == "check")
-            .expect("Could not find check method");
-
-        assert_eq!(add_method.path, "com/example/EnumTest");
-        assert_eq!(add_method.name, "check");
-        assert_eq!(add_method.signature, "(II)I");
-        assert_eq!(add_method.args, vec!["I", "I"]);
-        assert_eq!(add_method.return_type, "I");
-    }
-
-    #[test]
-    fn test_parse_constructor() {
-        let class_name = "com.ctre.phoenix6.hardware.TalonFX";
-        let class_path = Some("Z:\\frcrs\\unwrapped".to_string());
-        let bindings = parse_javap_output(class_name, class_path);
-
-        assert!(!bindings.is_empty(), "No bindings were parsed");
-
-        let add_method = bindings.iter().find(|b| b.name == "X")
-            .expect("Could not find new method");
-    }
-
-    #[test]
     fn test_parse_descriptor() {
-        assert_eq!(
-            parse_descriptor_args("(II)I"),
-            vec!["I", "I"]
-        );
+        assert_eq!(parse_descriptor_args("(II)I"), vec!["I", "I"]);
         assert_eq!(
             parse_descriptor_args("(ILjava/lang/String;[I)V"),
             vec!["I", "java/lang/String", "[I"]
         );
-        assert_eq!(
-            parse_descriptor_return("(II)I"),
-            "I"
-        );
+        assert_eq!(parse_descriptor_return("(II)I"), "I");
         assert_eq!(
             parse_descriptor_args("(Lcom/example/EnumTest$CountEnum;)I"),
             vec!["Lcom/example/EnumTest$CountEnum;"]
         );
-        assert_eq!(
-            parse_descriptor_return("(Lcom/example/EnumTest$CountEnum;)I"),
-            "I"
-        )
+        assert_eq!(parse_descriptor_return("(Lcom/example/EnumTest$CountEnum;)I"), "I");
+    }
+
+    #[test]
+    fn test_parse_car() {
+        let bindings = parse_javap_output(
+            "com.example.Car",
+            Some("examples/java/src".to_string()),
+        );
+        assert!(!bindings.is_empty(), "No bindings parsed");
+
+        let ctor = bindings.iter().find(|b| b.is_constructor).expect("No constructor");
+        assert_eq!(ctor.path, "com/example/Car");
+        assert_eq!(ctor.signature, "(Ljava/lang/String;Ljava/lang/String;ILcom/example/Car$CarType;)V");
+
+        assert!(bindings.iter().any(|b| b.name == "getMake"));
+        assert!(bindings.iter().any(|b| b.name == "displayInfo"));
     }
 }
