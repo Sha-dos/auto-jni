@@ -1,45 +1,74 @@
-# Auto JNI
-## Automatically create bindings to Java through JNI
+# auto-jni
 
-This was created to simplify created bindings for [frcrs](https://github.com/Team-2502/frcrs) and to make it easier to create bindings for other projects.
+Automatically generate Rust bindings for Java classes via JNI. Point it at your compiled `.class` files and it produces a type-safe Rust struct with methods that call straight through to Java.
 
-### Auto JNI is a heavy work in progress and their are many features still being implemented.
-- [x] Initialize Classes
-- [x] Call Methods (static and instance)
-- [x] Create enums
-- [ ] Improve API
-- [ ] Add more examples
-- [ ] Add more documentation
-- [ ] Add more tests
-- [ ] Add more error handling
-- [ ] Add more logging
+## Setup
 
-### Example
-Example.java
-```java
-package com.example;
-class Example {
-    public static int add(int a, int b) {
-        return a + b;
-    }
-}
+The crate has two roles, separated by a feature flag:
+
+| Role | Cargo section | Feature |
+|---|---|---|
+| Runtime (generated code + macros) | `[dependencies]` | *(none)* |
+| Build-time codegen | `[build-dependencies]` | `build` |
+
+```toml
+# Cargo.toml
+[dependencies]
+auto-jni = "0.0.3"
+
+[build-dependencies]
+auto-jni = { version = "0.0.3", features = ["build"] }
 ```
-build.rs
+
+## Usage
+
+**`build.rs`** call `generate_bindings_file` with your class names and classpath:
+
 ```rust
+use std::{env, path::Path};
+use auto_jni::generate_bindings_file;
+
 fn main() {
-    println!("cargo:rerun-if-changed=build.rs");
-
     let out = env::var("OUT_DIR").unwrap();
-    let file = Path::new(&out).join("bindings.rs");
-    let class_name = vec![
-        "com.example.Example"
-    ];
-    let class_path = Some("build".to_string());
-
-    let options = vec![
-        "-Djava.class.path=build".to_string(),
-    ];
-
-    generate_bindings_file(class_name, class_path, &*file, Some(options)).expect("Failed to generate bindings");
+    generate_bindings_file(
+        vec!["com.example.Car"],
+        Some("path/to/classes".into()),
+        &Path::new(&out).join("bindings.rs"),
+        Some(vec!["-Djava.class.path=path/to/classes".into()]),
+    ).unwrap();
 }
 ```
+
+**`src/main.rs`** — include the generated file and use the structs directly:
+
+```rust
+include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+fn main() {
+    let make  = java().new_string("Toyota").unwrap();
+    let model = java().new_string("Camry").unwrap();
+    let car_type = com_example_Car::com_example_Car_CarType_from_str("SEDAN");
+
+    let car = com_example_Car::new(&make, &model, 2024, &car_type).unwrap();
+    car.displayInfo().unwrap();
+}
+```
+
+## What gets generated
+
+For each class you get:
+
+- A struct named after the fully-qualified class (dots replaced with underscores), e.g. `com_example_Car`
+- `fn new(...)` for each constructor
+- `fn method_name(&self, ...)` for instance methods
+- `fn method_name(...)` for static methods
+- A `fn TypeName_from_str(s: &str)` helper for each enum/inner-class argument type
+- `fn inner(&self) -> &GlobalRef` to access the raw JNI reference
+
+Method IDs and class references are cached in `OnceCell` statics, so the JNI lookup only happens once per method across all calls.
+
+## Requirements
+
+- A JDK on `PATH` (for `javap` at build time and the JVM at runtime)
+- Compiled `.class` files for the Java classes you want to bind
+
