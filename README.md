@@ -14,10 +14,10 @@ The crate has two roles, separated by a feature flag:
 ```toml
 # Cargo.toml
 [dependencies]
-auto-jni = "0.0.3"
+auto-jni = "0.0.4"
 
 [build-dependencies]
-auto-jni = { version = "0.0.3", features = ["build"] }
+auto-jni = { version = "0.0.4", features = ["build"] }
 ```
 
 ## Usage
