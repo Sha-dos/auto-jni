@@ -11,3 +11,4 @@ pub enum JNIError {
     ThreadDetached,
     AttachFailed,
     UnknownError,
+}
